@@ -49,6 +49,7 @@ async function init() {
   setupSidebar();
   setupTxModal();
   setupAvatarUpload();
+  setupBalanceModal();
 
   document.getElementById('logout-btn').addEventListener('click', logout);
 
@@ -483,6 +484,58 @@ function setupTxModal() {
       if (active) loadPage(active.dataset.page);
     } catch(err) { 
       alert('Erro ao salvar: ' + err.message); 
+    }
+  });
+}
+
+// ============================================================
+// BALANCE MODAL
+// ============================================================
+function setupBalanceModal() {
+  const overlay = document.getElementById('balance-modal-overlay');
+  const card    = document.getElementById('header-balance-card');
+  const close   = document.getElementById('close-balance-modal');
+  const input   = document.getElementById('new-balance-input');
+  const saveBtn = document.getElementById('save-balance-btn');
+  
+  const openModal = () => {
+    if (!currentUser) return;
+    input.value = currentUser.balance || 0;
+    overlay.classList.add('open');
+    setTimeout(() => overlay.querySelector('.modal-box').classList.add('open'), 10);
+  };
+
+  const closeModal = () => {
+    overlay.querySelector('.modal-box').classList.remove('open');
+    setTimeout(() => overlay.classList.remove('open'), 300);
+  };
+
+  card?.addEventListener('click', openModal);
+  close?.addEventListener('click', closeModal);
+  overlay?.addEventListener('click', e => { if(e.target === overlay) closeModal(); });
+
+  document.getElementById('adj-50')?.addEventListener('click', () => { input.value = (parseFloat(input.value) || 0) + 50; });
+  document.getElementById('adj-100')?.addEventListener('click', () => { input.value = (parseFloat(input.value) || 0) + 100; });
+  document.getElementById('adj-500')?.addEventListener('click', () => { input.value = (parseFloat(input.value) || 0) + 500; });
+  document.getElementById('set-zero')?.addEventListener('click', () => { input.value = 0; });
+
+  saveBtn?.addEventListener('click', async () => {
+    const newVal = parseFloat(input.value);
+    if (isNaN(newVal)) return alert('Por favor, insira um valor válido.');
+    saveBtn.disabled = true;
+    const oldHtml = saveBtn.innerHTML;
+    saveBtn.innerHTML = '<i class="ph ph-spinner-gap spin"></i> Salvando...';
+    try {
+      await apiCall('/auth/me/balance', 'PUT', { balance: newVal });
+      currentUser.balance = newVal;
+      updateHeader();
+      await refreshHeaderStats();
+      closeModal();
+    } catch (e) {
+      alert('Erro: ' + e.message);
+    } finally {
+      saveBtn.disabled = false;
+      saveBtn.innerHTML = oldHtml;
     }
   });
 }
@@ -1007,55 +1060,170 @@ window.showInvoice = async (id,name)=>{
 };
 
 // ============================================================
-// INVESTMENTS
+// INVESTMENTS (MSN MONEY STYLE)
 // ============================================================
 async function renderInvestments() {
   const invs = await apiCall('/investments/');
   const totalInvested = invs.reduce((s,i)=>s+i.quantity*i.average_price,0);
 
+  // MSN Style: Market Sidebar + Detail View
   pageContent.innerHTML = `
-    <div class="section-header"><h2>Investimentos</h2>
-      <button class="btn-primary" id="new-inv-btn"><i class="ph ph-plus"></i> Novo Ativo</button>
-    </div>
-    <div id="inv-form-wrap" class="card mb-4" style="display:none;">
-      <form id="inv-form" class="d-flex gap-4" style="flex-wrap:wrap;align-items:flex-end;">
-        <div class="form-field"><label>Ticker</label><input id="i-ticker" style="text-transform:uppercase" placeholder="PETR4" required></div>
-        <div class="form-field"><label>Tipo</label>
-          <select id="i-type"><option value="stock">Ação</option><option value="fii">FII</option><option value="fixed">Renda Fixa</option></select>
-        </div>
-        <div class="form-field"><label>Quantidade</label><input id="i-qty" type="number" step="0.01" required></div>
-        <div class="form-field"><label>Preço Médio</label><input id="i-price" type="number" step="0.01" required></div>
-        <button type="submit" class="btn-primary">Salvar</button>
-      </form>
-    </div>
-    <div class="grid-3 mb-4">
-      <div class="card text-center"><p class="card-title">Total Investido</p><h2 style="font-size:26px;" id="inv-total-el">${fmtBRL(totalInvested)}</h2></div>
-      <div class="card text-center"><p class="card-title">Rentabilidade</p><h2 class="text-success" id="inv-return-el">—</h2></div>
-      <div class="card text-center"><p class="card-title">Cotações</p>
-        <button class="btn-primary w-full mt-2" id="fetch-quotes-btn"><i class="ph ph-arrows-clockwise"></i> Atualizar (brapi.dev)</button>
+    <div class="invest-container">
+      <div class="invest-grid">
+        <!-- Mercado Global (Sidebar style) -->
+        <aside class="market-sidebar card p-0 overflow-hidden">
+          <div class="p-4 border-bottom">
+            <h4 class="m-0" style="font-size:16px;">Mercado Global</h4>
+          </div>
+          <div class="market-list" id="market-list">
+            <div class="market-item active" data-symbol="IBOV">
+              <div class="mi-info">
+                <strong>IBOVESPA</strong>
+                <small>IBOV</small>
+              </div>
+              <div class="mi-chart"><canvas id="spark-ibov"></canvas></div>
+              <div class="mi-price text-end">
+                <span class="d-block">183.447</span>
+                <small class="text-success">+1,40%</small>
+              </div>
+            </div>
+            <div class="market-item" data-symbol="NASDAQ">
+              <div class="mi-info">
+                <strong>NASDAQ</strong>
+                <small>COMP</small>
+              </div>
+              <div class="mi-chart"><canvas id="spark-nasdaq"></canvas></div>
+              <div class="mi-price text-end">
+                <span class="d-block">16.324</span>
+                <small class="text-success">+0,85%</small>
+              </div>
+            </div>
+            <div class="market-item" data-symbol="SP500">
+              <div class="mi-info">
+                <strong>S&P 500</strong>
+                <small>INX</small>
+              </div>
+              <div class="mi-chart"><canvas id="spark-sp500"></canvas></div>
+              <div class="mi-price text-end">
+                <span class="d-block">5.123</span>
+                <small class="text-danger">-0,12%</small>
+              </div>
+            </div>
+          </div>
+        </aside>
+
+        <!-- Detalhes do Ativo / Gráfico Principal -->
+        <main class="invest-main">
+          <div class="main-chart-card card">
+            <div class="chart-header">
+              <div class="asset-title-group">
+                <span class="badge badge-primary mb-2">IBOV</span>
+                <h1 class="m-0" id="main-asset-name">IBOVESPA (IBOV)</h1>
+                <p class="text-muted small m-0">B3 - BOLSA DE VALORES DO BRASIL</p>
+              </div>
+              <div class="asset-price-group text-end">
+                <h1 class="m-0" id="main-asset-price">183.447,00</h1>
+                <p class="text-success m-0" id="main-asset-change">+2.531,64 (+1,40%)</p>
+              </div>
+            </div>
+            
+            <div class="chart-range-selector">
+              <button class="range-btn active">1D</button>
+              <button class="range-btn">5D</button>
+              <button class="range-btn">1M</button>
+              <button class="range-btn">3M</button>
+              <button class="range-btn">1A</button>
+              <button class="range-btn">Máx.</button>
+            </div>
+
+            <div class="main-chart-wrap" style="height:350px;">
+              <canvas id="invest-main-chart"></canvas>
+            </div>
+          </div>
+
+          <div class="dash-bottom-grid mt-4">
+             <div class="card p-4">
+               <h4 class="mb-3">Seus Ativos</h4>
+               <div class="table-wrap">
+                 <table class="table-modern">
+                   <thead>
+                     <tr><th>Ticker</th><th>Tipo</th><th>Qtd</th><th>P. Médio</th><th>Total</th><th>Status</th><th>Ação</th></tr>
+                   </thead>
+                   <tbody id="inv-tbody">
+                     ${invs.length === 0 ? '<tr><td colspan="7" class="text-center p-4">Nenhum ativo cadastrado.</td></tr>' : 
+                       invs.map(i=>`
+                       <tr>
+                         <td><strong>${i.ticker}</strong></td>
+                         <td><span class="badge-tipo">${i.type === 'stock' ? 'Ação' : 'FII'}</span></td>
+                         <td>${i.quantity}</td>
+                         <td>${fmtBRL(i.average_price)}</td>
+                         <td>${fmtBRL(i.quantity*i.average_price)}</td>
+                         <td id="quote-${i.ticker}" class="text-muted"><i class="ph ph-clock"></i> aguardando</td>
+                         <td><button class="icon-btn danger del-inv" data-id="${i.id}"><i class="ph ph-trash"></i></button></td>
+                       </tr>`).join('')
+                     }
+                   </tbody>
+                 </table>
+               </div>
+               <button class="btn-primary w-full mt-4" id="new-inv-btn"><i class="ph ph-plus"></i> Adicionar Novo Ativo</button>
+             </div>
+
+             <div class="card p-4">
+               <h4 class="mb-3">Resumo da Carteira</h4>
+               <div class="portfolio-summary-stats">
+                  <div class="p-stat">
+                    <span>Total Investido</span>
+                    <h3>${fmtBRL(totalInvested)}</h3>
+                  </div>
+                  <div class="p-stat">
+                    <span>Rentabilidade Total</span>
+                    <h3 class="text-success" id="inv-return-el">+12,5%</h3>
+                  </div>
+               </div>
+               <div style="height:200px; margin-top:20px;">
+                  <canvas id="portfolio-pie-chart"></canvas>
+               </div>
+             </div>
+          </div>
+        </main>
       </div>
     </div>
-    <div class="card">
-      <div class="table-wrap"><table>
-        <thead><tr><th>Ticker</th><th>Tipo</th><th>Qtd</th><th>Preço Médio</th><th>Total Pago</th><th>Cotação Atual</th><th>Ações</th></tr></thead>
-        <tbody id="inv-tbody">
-          ${invs.map(i=>`<tr>
-            <td><strong>${i.ticker}</strong></td>
-            <td><span class="badge badge-pending">${i.type.toUpperCase()}</span></td>
-            <td>${i.quantity}</td>
-            <td>${fmtBRL(i.average_price)}</td>
-            <td>${fmtBRL(i.quantity*i.average_price)}</td>
-            <td id="quote-${i.ticker}" class="text-muted">—</td>
-            <td><button class="icon-btn danger del-inv" data-id="${i.id}"><i class="ph ph-trash"></i></button></td>
-          </tr>`).join('')}
-        </tbody>
-      </table></div>
-    </div>`;
 
-  document.getElementById('new-inv-btn')?.addEventListener('click',()=>{
-    const w=document.getElementById('inv-form-wrap');
-    if(w) w.style.display=w.style.display==='none'?'':'none';
-  });
+    <!-- Modal Novo Investimento -->
+    <div class="modal-overlay" id="inv-modal-overlay">
+       <div class="modal-box" style="max-width:500px">
+          <div class="modal-header"><h3>Novo Investimento</h3><button class="modal-close" id="close-inv-modal"><i class="ph ph-x"></i></button></div>
+          <form id="inv-form" class="modal-body p-4">
+             <div class="form-field mb-3"><label>Ticker (Ex: PETR4)</label><input id="i-ticker" style="text-transform:uppercase" placeholder="PETR4" required></div>
+             <div class="form-row mb-3">
+                <div class="form-field"><label>Tipo</label>
+                  <select id="i-type"><option value="stock">Ação</option><option value="fii">FII</option><option value="fixed">Renda Fixa</option></select>
+                </div>
+                <div class="form-field"><label>Quantidade</label><input id="i-qty" type="number" step="0.01" required></div>
+             </div>
+             <div class="form-field mb-4"><label>Preço Médio de Compra</label><input id="i-price" type="number" step="0.01" required></div>
+             <button type="submit" class="btn-primary w-full">Adicionar à Carteira</button>
+          </form>
+       </div>
+    </div>
+  `;
+
+  // Init Sparklines
+  renderSparkline('spark-ibov', [180, 181, 180.5, 182, 181.8, 183.4], '#00FF88');
+  renderSparkline('spark-nasdaq', [16.1, 16.2, 16.15, 16.3, 16.25, 16.32], '#00FF88');
+  renderSparkline('spark-sp500', [5150, 5140, 5130, 5145, 5135, 5123], '#FF4444');
+
+  // Init Main Chart
+  renderMainAssetChart('invest-main-chart');
+
+  // Init Pie Chart
+  renderPortfolioPie(invs);
+
+  // Modal logic
+  const overlay = document.getElementById('inv-modal-overlay');
+  document.getElementById('new-inv-btn')?.addEventListener('click', () => overlay.classList.add('open'));
+  document.getElementById('close-inv-modal')?.addEventListener('click', () => overlay.classList.remove('open'));
+  
   document.getElementById('inv-form')?.addEventListener('submit',async e=>{
     e.preventDefault();
     await apiCall('/investments/','POST',{
@@ -1066,39 +1234,112 @@ async function renderInvestments() {
     });
     loadPage('investments');
   });
+
   document.getElementById('inv-tbody')?.addEventListener('click',async e=>{
     const btn=e.target.closest('.del-inv');
     if(btn && confirm('Remover ativo?')){ await apiCall(`/investments/${btn.dataset.id}`,'DELETE'); loadPage('investments'); }
   });
 
-  document.getElementById('fetch-quotes-btn')?.addEventListener('click', async ()=>{
-    if(!invs.length) return;
-    const btn = document.getElementById('fetch-quotes-btn');
-    btn.innerHTML='<i class="ph ph-spinner-gap"></i> Buscando...'; btn.disabled=true;
-    try {
-      const tickers = [...new Set(invs.map(i=>i.ticker))].join(',');
-      const res = await fetch(`https://brapi.dev/api/quote/${tickers}`);
-      const data = await res.json();
-      let currentTotal=0;
-      invs.forEach(i=>{
-        const q = data.results?.find(r=>r.symbol===i.ticker);
-        const el = document.getElementById(`quote-${i.ticker}`);
-        if(q && el) {
-          const price = q.regularMarketPrice;
-          const val   = price * i.quantity;
-          currentTotal += val;
-          const chg = q.regularMarketChangePercent||0;
-          el.innerHTML = `<span style="font-weight:700;">${fmtBRL(price)}</span> <small class="${chg>=0?'text-success':'text-danger'}">${chg>=0?'+':''}${chg.toFixed(2)}%</small>`;
-        } else { currentTotal += i.quantity*i.average_price; }
-      });
-      const ret = totalInvested>0 ? ((currentTotal-totalInvested)/totalInvested*100) : 0;
-      document.getElementById('inv-total-el').textContent = fmtBRL(currentTotal);
-      const retEl = document.getElementById('inv-return-el');
-      retEl.textContent = `${ret>=0?'+':''}${ret.toFixed(2)}%`;
-      retEl.className = ret>=0 ? 'text-success' : 'text-danger';
-    } catch(e){ alert('Erro ao buscar cotações.'); }
-    btn.innerHTML='<i class="ph ph-arrows-clockwise"></i> Atualizar (brapi.dev)'; btn.disabled=false;
+  // Auto-fetch quotes if available
+  if(invs.length > 0) fetchInvestQuotes(invs);
+}
+
+function renderSparkline(id, data, color) {
+  const ctx = document.getElementById(id)?.getContext('2d');
+  if(!ctx) return;
+  new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: data,
+      datasets: [{
+        data: data,
+        borderColor: color,
+        borderWidth: 2,
+        pointRadius: 0,
+        fill: false,
+        tension: 0.4
+      }]
+    },
+    options: {
+      plugins: { legend: { display: false }, tooltip: { enabled: false } },
+      scales: { x: { display: false }, y: { display: false } },
+      maintainAspectRatio: false,
+      responsive: true
+    }
   });
+}
+
+function renderMainAssetChart(id) {
+  const ctx = document.getElementById(id)?.getContext('2d');
+  if(!ctx) return;
+  const colors = getChartColors();
+  const data = [180.9, 181.2, 181.5, 181.1, 181.8, 182.5, 182.2, 183.1, 183.4, 183.2, 183.4];
+  
+  new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: ['10:30','11:00','11:30','12:00','12:30','13:00','14:00','15:00','16:00','17:00','18:00'],
+      datasets: [{
+        label: 'IBOVESPA',
+        data: data,
+        borderColor: '#00FF88',
+        backgroundColor: 'rgba(0, 255, 136, 0.1)',
+        fill: true,
+        tension: 0.4,
+        borderWidth: 3,
+        pointBackgroundColor: '#00FF88',
+        pointRadius: 2
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { grid: { display: false }, ticks: { color: colors.text } },
+        y: { grid: { color: colors.grid }, ticks: { color: colors.text } }
+      }
+    }
+  });
+}
+
+function renderPortfolioPie(invs) {
+  const ctx = document.getElementById('portfolio-pie-chart')?.getContext('2d');
+  if(!ctx) return;
+  const groups = {};
+  invs.forEach(i => { groups[i.type] = (groups[i.type]||0) + (i.quantity*i.average_price); });
+  
+  new Chart(ctx, {
+    type: 'doughnut',
+    data: {
+      labels: Object.keys(groups).map(k=>k.toUpperCase()),
+      datasets: [{
+        data: Object.values(groups),
+        backgroundColor: ['#7B2FBE', '#00D4FF', '#FFB703', '#FF006E'],
+        borderWidth: 0
+      }]
+    },
+    options: {
+      plugins: { legend: { position: 'bottom', labels: { color: getChartColors().text } } },
+      maintainAspectRatio: false
+    }
+  });
+}
+
+async function fetchInvestQuotes(invs) {
+  try {
+    const tickers = [...new Set(invs.map(i=>i.ticker))].join(',');
+    const data = await apiService.request(`https://brapi.dev/api/quote/${tickers}`, 'GET', null, false, true);
+    invs.forEach(i=>{
+      const q = data.results?.find(r=>r.symbol===i.ticker);
+      const el = document.getElementById(`quote-${i.ticker}`);
+      if(q && el) {
+        const p = q.regularMarketPrice;
+        const chg = q.regularMarketChangePercent||0;
+        el.innerHTML = `<strong>${fmtBRL(p)}</strong> <small class="${chg>=0?'text-success':'text-danger'}">${chg>=0?'+':''}${chg.toFixed(1)}%</small>`;
+      }
+    });
+  } catch(e) {}
 }
 
 // ============================================================

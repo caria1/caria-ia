@@ -200,7 +200,7 @@
                         <span class="hsc-value" id="header-expense">R$ 0,00</span>
                     </div>
                 </div>
-                <div class="header-stat-card balance">
+                <div class="header-stat-card balance" id="header-balance-card" title="Clique para alterar o saldo">
                     <div class="hsc-icon"><i class="ph-fill ph-wallet"></i></div>
                     <div class="hsc-info">
                         <span class="hsc-label">Saldo</span>
@@ -293,6 +293,34 @@
             </label>
             <button type="submit" class="btn-primary w-full mt-4">Salvar Transação</button>
         </form>
+    </div>
+</div>
+
+<!-- ===== BALANCE UPDATE MODAL ===== -->
+<div class="modal-overlay" id="balance-modal-overlay">
+    <div class="modal-box balance-modal-box">
+        <div class="modal-header">
+            <h3>Ajustar Saldo Atual</h3>
+            <button class="modal-close" id="close-balance-modal"><i class="ph ph-x"></i></button>
+        </div>
+        <div class="modal-body">
+            <p class="text-secondary mb-4" style="font-size: 14px;">Insira o novo saldo total da sua conta.</p>
+            <div class="modern-num-input">
+                <span class="currency-prefix">R$</span>
+                <input type="number" id="new-balance-input" step="0.01" placeholder="0,00">
+            </div>
+            
+            <div class="quick-balance-options">
+                <button class="btn-outline btn-sm" id="adj-50">+50</button>
+                <button class="btn-outline btn-sm" id="adj-100">+100</button>
+                <button class="btn-outline btn-sm" id="adj-500">+500</button>
+                <button class="btn-outline btn-sm" id="set-zero">Zerar</button>
+            </div>
+
+            <button type="button" class="btn-primary w-full mt-6" id="save-balance-btn">
+                <span>Confirmar Novo Saldo</span>
+            </button>
+        </div>
     </div>
 </div>
 
