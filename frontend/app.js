@@ -32,10 +32,73 @@ const authView   = document.getElementById('auth-view');
 const appView    = document.getElementById('app-view');
 const pageContent= document.getElementById('page-content');
 
-// ---- Helper: show/hide views ----
+// ---- Helper: UI Feedback & Views ----
 function showView(v) {
-  authView.style.display = v === 'auth' ? 'flex' : 'none';
-  appView.style.display  = v === 'app'  ? 'flex' : 'none';
+  const views = ['auth', 'app'];
+  views.forEach(viewId => {
+    const el = document.getElementById(`${viewId}-view`);
+    if (!el) return;
+    if (viewId === v) {
+      el.style.display = 'flex';
+      el.classList.add('active');
+    } else {
+      el.style.display = 'none';
+      el.classList.remove('active');
+    }
+  });
+}
+
+/**
+ * Premium Toast Notifications
+ * @param {string} msg - Message to show
+ * @param {string} type - success, error, warning
+ */
+function showToast(msg, type = 'success') {
+  const container = document.getElementById('toast-container');
+  if (!container) return;
+
+  const toast = document.createElement('div');
+  toast.className = `toast ${type}`;
+  
+  const iconMap = {
+    success: 'ph-fill ph-check-circle',
+    error: 'ph-fill ph-x-circle',
+    warning: 'ph-fill ph-warning-circle'
+  };
+
+  toast.innerHTML = `
+    <i class="${iconMap[type] || 'ph-fill ph-info'}"></i>
+    <span>${msg}</span>
+  `;
+
+  container.appendChild(toast);
+
+  // Auto remove after 5s
+  setTimeout(() => {
+    toast.classList.add('out');
+    setTimeout(() => toast.remove(), 400);
+  }, 5000);
+
+  // Remove on click
+  toast.onclick = () => {
+    toast.classList.add('out');
+    setTimeout(() => toast.remove(), 400);
+  };
+}
+
+/**
+ * Skeleton Loader Generator
+ * @param {HTMLElement} container - Where to inject skeletons
+ * @param {string} type - 'card', 'text', 'title'
+ * @param {number} count - How many skeletons
+ */
+function setSkeleton(container, type = 'card', count = 3) {
+  if (!container) return;
+  let html = '';
+  for (let i = 0; i < count; i++) {
+    html += `<div class="skeleton skeleton-${type}"></div>`;
+  }
+  container.innerHTML = html;
 }
 
 // ============================================================
@@ -232,13 +295,15 @@ const apiService = {
         json = await res.json();
       } catch (e) {
         if (!res.ok) {
-          const error = new Error('Servidor indisponível. Tente novamente.');
+          showToast('Servidor indisponível. Tente novamente.', 'error');
+          const error = new Error('Servidor indisponível.');
           error.status = res.status;
           throw error;
         }
       }
 
       if (!res.ok) {
+        showToast(json.detail || 'Erro na requisição', 'error');
         const error = new Error(json.detail || 'Erro na requisição');
         error.status = res.status;
         throw error;
@@ -249,6 +314,11 @@ const apiService = {
       }
       return json;
 
+    } catch (err) {
+      if (err.status === 401) {
+        showToast('Sessão expirada. Faça login novamente.', 'warning');
+      }
+      throw err;
     } finally {
       document.body.classList.remove('loading');
     }
@@ -411,7 +481,10 @@ async function loadPage(page) {
   // Destroy charts
   Object.values(charts).forEach(c => { try{c.destroy();}catch(e){} });
   charts = {};
-  pageContent.innerHTML = `<div class="spinner"><i class="ph ph-spinner-gap"></i></div>`;
+  
+  // Premium Skeleton Loading
+  setSkeleton(pageContent, 'card', 4);
+  
   try {
     switch(page) {
       case 'dashboard':    await renderDashboard(); break;
@@ -428,7 +501,14 @@ async function loadPage(page) {
     }
   } catch(err) {
     console.error(err);
-    pageContent.innerHTML = `<div class="card"><p class="text-danger">Erro ao carregar: ${err.message}</p></div>`;
+    showToast(`Erro ao carregar página: ${err.message}`, 'error');
+    pageContent.innerHTML = `
+      <div class="empty-state">
+        <i class="ph ph-warning-circle"></i>
+        <p>Ops! Ocorreu um erro ao carregar esta seção.</p>
+        <button class="btn-primary mt-4" onclick="loadPage('${page}')">Tentar Novamente</button>
+      </div>
+    `;
   }
 }
 
@@ -438,37 +518,30 @@ async function loadPage(page) {
 function setupTxModal() {
   const overlay = document.getElementById('tx-modal-overlay');
   document.getElementById('open-tx-modal')?.addEventListener('click', openTxModal);
-  document.getElementById('close-tx-modal')?.addEventListener('click', () => overlay.classList.remove('open'));
-  overlay?.addEventListener('click', e => { if(e.target===overlay) overlay.classList.remove('open'); });
+  
+  const closeModal = () => overlay.classList.remove('open');
+  document.getElementById('close-tx-modal')?.addEventListener('click', closeModal);
+  document.getElementById('cancel-tx-btn')?.addEventListener('click', closeModal);
+  overlay?.addEventListener('click', e => { if(e.target===overlay) closeModal(); });
 
   document.getElementById('transaction-form')?.addEventListener('submit', async e => {
     e.preventDefault();
     
-    // Validations
+    // Validations with Toasts
     const amountVal = document.getElementById('tx-amount').value;
     const amount = parseFloat(amountVal);
     const desc = document.getElementById('tx-desc').value.trim();
     const categoryId = document.getElementById('tx-category').value;
     const date = document.getElementById('tx-date').value;
 
-    if (isNaN(amount) || amount <= 0) {
-      return alert('O valor da transação deve ser positivo.');
-    }
-    if (!desc) {
-      return alert('Por favor, insira uma descrição.');
-    }
-    if (!categoryId) {
-      return alert('Escolha uma categoria.');
-    }
-    if (!date) {
-      return alert('Selecione uma data válida.');
-    }
+    if (isNaN(amount) || amount <= 0) return showToast('O valor deve ser positivo.', 'warning');
+    if (!desc) return showToast('Insira uma descrição.', 'warning');
+    if (!categoryId) return showToast('Escolha uma categoria.', 'warning');
+    if (!date) return showToast('Selecione uma data.', 'warning');
 
     const type = document.querySelector('input[name="tx-type"]:checked')?.value || 'expense';
     const body = {
-      type,
-      amount,
-      description: desc,
+      type, amount, description: desc,
       category_id: parseInt(categoryId),
       date,
       is_recurring: document.getElementById('tx-recurring').checked,
@@ -477,24 +550,19 @@ function setupTxModal() {
     
     try {
       await apiCall('/transactions/', 'POST', body);
-      apiService.clearCache(); // Limpa cache para refletir mudanças
-      overlay.classList.remove('open');
+      apiService.clearCache();
+      closeModal();
+      showToast('Transação salva com sucesso!');
       await refreshHeaderStats();
       const active = document.querySelector('.nav-item.active');
       if (active) loadPage(active.dataset.page);
-    } catch(err) { 
-      alert('Erro ao salvar: ' + err.message); 
-    }
+    } catch(err) { /* Toast is handled in apiService */ }
   });
 }
 
-// ============================================================
-// BALANCE MODAL
-// ============================================================
 function setupBalanceModal() {
   const overlay = document.getElementById('balance-modal-overlay');
   const card    = document.getElementById('header-balance-card');
-  const close   = document.getElementById('close-balance-modal');
   const input   = document.getElementById('new-balance-input');
   const saveBtn = document.getElementById('save-balance-btn');
   
@@ -502,16 +570,13 @@ function setupBalanceModal() {
     if (!currentUser) return;
     input.value = currentUser.balance || 0;
     overlay.classList.add('open');
-    setTimeout(() => overlay.querySelector('.modal-box').classList.add('open'), 10);
   };
 
-  const closeModal = () => {
-    overlay.querySelector('.modal-box').classList.remove('open');
-    setTimeout(() => overlay.classList.remove('open'), 300);
-  };
+  const closeModal = () => overlay.classList.remove('open');
 
   card?.addEventListener('click', openModal);
-  close?.addEventListener('click', closeModal);
+  document.getElementById('close-balance-modal')?.addEventListener('click', closeModal);
+  document.getElementById('cancel-balance-btn')?.addEventListener('click', closeModal);
   overlay?.addEventListener('click', e => { if(e.target === overlay) closeModal(); });
 
   document.getElementById('adj-50')?.addEventListener('click', () => { input.value = (parseFloat(input.value) || 0) + 50; });
@@ -521,18 +586,19 @@ function setupBalanceModal() {
 
   saveBtn?.addEventListener('click', async () => {
     const newVal = parseFloat(input.value);
-    if (isNaN(newVal)) return alert('Por favor, insira um valor válido.');
+    if (isNaN(newVal)) return showToast('Insira um valor válido.', 'warning');
     saveBtn.disabled = true;
     const oldHtml = saveBtn.innerHTML;
-    saveBtn.innerHTML = '<i class="ph ph-spinner-gap spin"></i> Salvando...';
+    saveBtn.innerHTML = '<i class="ph ph-spinner-gap spin"></i>';
     try {
       await apiCall('/auth/me/balance', 'PUT', { balance: newVal });
       currentUser.balance = newVal;
       updateHeader();
       await refreshHeaderStats();
+      showToast('Saldo atualizado com sucesso!');
       closeModal();
     } catch (e) {
-      alert('Erro: ' + e.message);
+      /* Handled by apiService */
     } finally {
       saveBtn.disabled = false;
       saveBtn.innerHTML = oldHtml;

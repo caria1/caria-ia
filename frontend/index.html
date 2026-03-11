@@ -253,45 +253,50 @@
             <h3>Nova Transação</h3>
             <button class="modal-close" id="close-tx-modal"><i class="ph ph-x"></i></button>
         </div>
-        <form id="transaction-form" class="modal-body">
-            <div class="tx-type-toggle">
-                <label class="tx-type-opt">
-                    <input type="radio" name="tx-type" value="expense" checked>
-                    <span class="badge-expense"><i class="ph ph-arrow-down"></i> Despesa</span>
+        <form id="transaction-form">
+            <div class="modal-body">
+                <div class="tx-type-toggle">
+                    <label class="tx-type-opt">
+                        <input type="radio" name="tx-type" value="expense" checked>
+                        <span class="badge-expense"><i class="ph ph-arrow-down"></i> Despesa</span>
+                    </label>
+                    <label class="tx-type-opt">
+                        <input type="radio" name="tx-type" value="income">
+                        <span class="badge-income"><i class="ph ph-arrow-up"></i> Receita</span>
+                    </label>
+                </div>
+                <div class="form-row">
+                    <div class="form-field">
+                        <label>Valor (R$)</label>
+                        <input type="number" id="tx-amount" step="0.01" placeholder="0,00" required>
+                    </div>
+                    <div class="form-field">
+                        <label>Data</label>
+                        <input type="date" id="tx-date" required>
+                    </div>
+                </div>
+                <div class="form-field">
+                    <label>Descrição</label>
+                    <input type="text" id="tx-desc" placeholder="Ex: Aluguel, Supermercado..." required>
+                </div>
+                <div class="form-row">
+                    <div class="form-field">
+                        <label>Categoria</label>
+                        <select id="tx-category" required></select>
+                    </div>
+                    <div class="form-field">
+                        <label>Cartão (opcional)</label>
+                        <select id="tx-card"><option value="">Nenhum</option></select>
+                    </div>
+                </div>
+                <label class="checkbox-label">
+                    <input type="checkbox" id="tx-recurring"> Transação recorrente (mensal)
                 </label>
-                <label class="tx-type-opt">
-                    <input type="radio" name="tx-type" value="income">
-                    <span class="badge-income"><i class="ph ph-arrow-up"></i> Receita</span>
-                </label>
             </div>
-            <div class="form-row">
-                <div class="form-field">
-                    <label>Valor (R$)</label>
-                    <input type="number" id="tx-amount" step="0.01" placeholder="0,00" required>
-                </div>
-                <div class="form-field">
-                    <label>Data</label>
-                    <input type="date" id="tx-date" required>
-                </div>
+            <div class="modal-footer">
+                <button type="button" class="btn-secondary" id="cancel-tx-btn">Cancelar</button>
+                <button type="submit" class="btn-primary">Salvar Transação</button>
             </div>
-            <div class="form-field">
-                <label>Descrição</label>
-                <input type="text" id="tx-desc" placeholder="Ex: Aluguel, Supermercado..." required>
-            </div>
-            <div class="form-row">
-                <div class="form-field">
-                    <label>Categoria</label>
-                    <select id="tx-category" required></select>
-                </div>
-                <div class="form-field">
-                    <label>Cartão (opcional)</label>
-                    <select id="tx-card"><option value="">Nenhum</option></select>
-                </div>
-            </div>
-            <label class="checkbox-label">
-                <input type="checkbox" id="tx-recurring"> Transação recorrente (mensal)
-            </label>
-            <button type="submit" class="btn-primary w-full mt-4">Salvar Transação</button>
         </form>
     </div>
 </div>
@@ -304,25 +309,30 @@
             <button class="modal-close" id="close-balance-modal"><i class="ph ph-x"></i></button>
         </div>
         <div class="modal-body">
-            <p class="text-secondary mb-4" style="font-size: 14px;">Insira o novo saldo total da sua conta.</p>
-            <div class="modern-num-input">
-                <span class="currency-prefix">R$</span>
-                <input type="number" id="new-balance-input" step="0.01" placeholder="0,00">
+            <div class="form-field">
+                <label>Novo Saldo Total</label>
+                <div class="modern-num-input">
+                    <span class="currency-prefix">R$</span>
+                    <input type="number" id="new-balance-input" step="0.01" placeholder="0,00">
+                </div>
             </div>
             
-            <div class="quick-balance-options">
-                <button class="btn-outline btn-sm" id="adj-50">+50</button>
-                <button class="btn-outline btn-sm" id="adj-100">+100</button>
-                <button class="btn-outline btn-sm" id="adj-500">+500</button>
-                <button class="btn-outline btn-sm" id="set-zero">Zerar</button>
+            <div class="quick-balance-options mt-4">
+                <button class="btn-secondary btn-sm" id="adj-50">+50</button>
+                <button class="btn-secondary btn-sm" id="adj-100">+100</button>
+                <button class="btn-secondary btn-sm" id="adj-500">+500</button>
+                <button class="btn-secondary btn-sm" id="set-zero">Zerar</button>
             </div>
-
-            <button type="button" class="btn-primary w-full mt-6" id="save-balance-btn">
-                <span>Confirmar Novo Saldo</span>
-            </button>
+        </div>
+        <div class="modal-footer">
+            <button type="button" class="btn-secondary" id="cancel-balance-btn">Cancelar</button>
+            <button type="button" class="btn-primary" id="save-balance-btn">Confirmar Novo Saldo</button>
         </div>
     </div>
 </div>
+
+<!-- Toast Container -->
+<div id="toast-container"></div>
 
 <!-- Hidden file inputs -->
 <input type="file" id="profile-pic-input" accept="image/*" style="display:none;">

@@ -2,6 +2,7 @@ import logging
 import os
 import sys
 import time
+from datetime import datetime
 from fastapi import FastAPI, Request, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -75,13 +76,23 @@ from backend.routers import auth, transactions, categories, goals, ai, bills, ca
 # Evento de Startup para estabilidade
 @app.on_event("startup")
 def startup_event():
-    logger.info("Executando tarefas de inicialização...")
+    db_url = os.getenv("DATABASE_URL", "sqlite")
+    secret = os.getenv("SECRET_KEY", "")
+    
+    if not secret and os.getenv("RAILWAY_ENVIRONMENT"):
+        logger.warning("⚠️ ALERTA: SECRET_KEY não definida em produção! Isso causará logouts frequentes.")
+    
+    masked_url = db_url.split('@')[-1] if '@' in db_url else db_url
+    logger.info(f"🚀 Iniciando aplicação... Banco: {masked_url}")
     try:
-        # Criar Tabelas
         models.Base.metadata.create_all(bind=engine)
-        logger.info("Tabelas do Banco de Dados verificadas/criadas.")
+        logger.info("✅ Tabelas sincronizadas com sucesso!")
     except Exception as e:
-        logger.error(f"Erro no startup: {e}")
+        logger.error(f"❌ Erro ao sincronizar tabelas: {e}")
+
+@app.get("/api/health")
+def health_check():
+    return {"status": "healthy", "timestamp": datetime.now().isoformat()}
 
 # Registrar Roteadores
 app.include_router(auth.router, prefix="/api/auth", tags=["Auth"])
@@ -117,3 +128,9 @@ async def spa_exception_handler(request: Request, exc: StarletteHTTPException):
 if os.path.exists(frontend_dir):
     app.mount("/", StaticFiles(directory=frontend_dir, html=True), name="frontend")
     logger.info("Frontend montado com sucesso.")
+
+if __name__ == "__main__":
+    import uvicorn
+    # Use port from environment (Railway) or default to 8000
+    port = int(os.getenv("PORT", 8000))
+    uvicorn.run(app, host="0.0.0.0", port=port)
