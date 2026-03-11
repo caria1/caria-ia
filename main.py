@@ -2,11 +2,14 @@ import logging
 import os
 import sys
 import time
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
+from backend.security import limiter
 
 # Configuração de Logs
 logging.basicConfig(level=logging.INFO)
@@ -19,23 +22,45 @@ if current_dir not in sys.path:
 
 app = FastAPI(title="Caria IA")
 
+# Limiter (Rate Limit)
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
 # 1. CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origin_regex="https://.*\.railway\.app|http://localhost:.*",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# 2. Logging de Requisições
+# 2. Segurança (Security Headers - "Helmet Lite")
 @app.middleware("http")
-async def log_requests(request: Request, call_next):
-    start_time = time.time()
+async def add_security_headers(request: Request, call_next):
     response = await call_next(request)
-    duration = time.time() - start_time
-    logger.info(f"{request.method} {request.url.path} - {response.status_code} ({duration:.2f}s)")
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["X-XSS-Protection"] = "1; mode=block"
+    response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+    response.headers["Content-Security-Policy"] = "default-src 'self' https:; script-src 'self' 'unsafe-inline' 'unsafe-eval' https:; style-src 'self' 'unsafe-inline' https:; img-src 'self' data: https:;"
     return response
+
+# 3. Logging & Global Error Handling
+@app.middleware("http")
+async def log_and_handle_errors(request: Request, call_next):
+    start_time = time.time()
+    try:
+        response = await call_next(request)
+        duration = time.time() - start_time
+        logger.info(f"{request.method} {request.url.path} - {response.status_code} ({duration:.2f}s)")
+        return response
+    except Exception as e:
+        logger.error(f"GLOBAL ERROR: {str(e)}", exc_info=True)
+        return JSONResponse(
+            status_code=500,
+            content={"detail": "Erro interno do servidor. Nossa IA já foi notificada.", "error": str(e)}
+        )
 
 # 3. Health Check
 @app.get("/api/health")

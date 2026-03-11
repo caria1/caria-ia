@@ -11,3 +11,4 @@ python-dotenv
 httpx
 aiofiles
 bcrypt
+slowapi

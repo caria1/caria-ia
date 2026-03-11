@@ -13,6 +13,13 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <!-- Phosphor Icons -->
     <script src="https://unpkg.com/@phosphor-icons/web@2.1.1"></script>
+    <!-- PWA -->
+    <link rel="manifest" href="/manifest.json">
+    <meta name="theme-color" content="#7B2FBE">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="apple-touch-icon" href="/api/uploads/pwa_icon_512.png">
+
     <link rel="stylesheet" href="/styles.css">
 </head>
 <body>
@@ -200,6 +207,30 @@
         <main class="page-content" id="page-content">
             <!-- Injected dynamically -->
         </main>
+
+        <!-- BOTTOM NAVIGATION (MOBILE) -->
+        <nav class="bottom-nav">
+            <a href="#" class="nav-item active" data-page="dashboard">
+                <i class="ph ph-squares-four"></i>
+                <span>Home</span>
+            </a>
+            <a href="#" class="nav-item" data-page="transactions">
+                <i class="ph ph-arrows-left-right"></i>
+                <span>Extrato</span>
+            </a>
+            <a href="#" class="nav-item" data-page="advisor">
+                <i class="ph ph-brain"></i>
+                <span>IA Advisor</span>
+            </a>
+            <a href="#" class="nav-item" data-page="reports">
+                <i class="ph ph-chart-bar"></i>
+                <span>Relatórios</span>
+            </a>
+            <a href="#" class="nav-item" data-page="profile">
+                <i class="ph ph-user"></i>
+                <span>Perfil</span>
+            </a>
+        </nav>
     </div>
 </div>
 
@@ -258,5 +289,14 @@
 <input type="file" id="csv-import-input" accept=".csv,.ofx" style="display:none;">
 
 <script src="/app.js"></script>
+<script>
+    if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+            navigator.serviceWorker.register('/service-worker.js')
+                .then(reg => console.log('SW Registered', reg))
+                .catch(err => console.log('SW Failed', err));
+        });
+    }
+</script>
 </body>
 </html>

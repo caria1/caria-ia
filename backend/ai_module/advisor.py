@@ -1,30 +1,41 @@
-﻿from collections import defaultdict
+from collections import defaultdict
 import datetime
 from typing import List
 import random
 
 def generate_insights(transactions, categories):
     if not transactions:
-        return ["Você ainda não tem transações suficientes para análise."]
+        return ["Você ainda não tem transações suficientes para uma análise profunda. Registre suas despesas diárias para começar!"]
     
+    # 1. Basic Stats
     total_income = sum(t.amount for t in transactions if t.type == "income")
     total_expense = sum(t.amount for t in transactions if t.type == "expense")
+    net_savings = total_income - total_expense
     
     insights = []
     
-    # Savings Rate
+    # 2. Savings Rate Analysis
     if total_income > 0:
-        savings = total_income - total_expense
-        savings_rate = (savings / total_income) * 100
+        savings_rate = (net_savings / total_income) * 100
         
-        if savings_rate >= 20:
-            insights.append(f"Ótimo trabalho! Você economiza cerca de {savings_rate:.1f}% da sua renda. Este é um índice de poupança muito forte!")
+        if savings_rate >= 30:
+            insights.append("🌟 **Nível Elite:** Sua taxa de poupança está acima de 30%. Você está no caminho rápido para a liberdade financeira!")
+        elif savings_rate >= 15:
+            insights.append(f"✅ **Bom progresso:** Você economizou {savings_rate:.1f}% da sua renda. Tente chegar aos 20% para otimizar seus investimentos.")
         elif savings_rate > 0:
-            insights.append(f"Sua taxa de economia é de {savings_rate:.1f}%. Tente reduzir gastos variáveis para chegar na faixa ideal de 20%.")
+            insights.append(f"⚠️ **Margem Apertada:** Sua taxa de economia é de apenas {savings_rate:.1f}%. Qualquer imprevisto pode comprometer seu orçamento.")
         else:
-            insights.append("Atenção! Suas despesas estão superando sua renda. É recomendado revisar seus maiores gastos imediatamente.")
-            
-    # Categories analysis
+            insights.append("🚨 **Alerta de Déficit:** Suas despesas superaram sua renda. É crucial cortar gastos não essenciais imediatamente.")
+
+    # 3. Emergency Fund Insight (assuming basic balance check)
+    avg_monthly_expense = total_expense / max(1, (len(set(t.date.strftime("%Y-%m") for t in transactions)) or 1))
+    # We'd need current balance, but we can infer from net_savings for now
+    if net_savings > 0 and net_savings < (avg_monthly_expense * 3):
+        insights.append(f"🛡️ **Reserva de Emergência:** Você ainda não possui 3 meses de despesas guardados (estimado em {avg_monthly_expense*3:.0f},00). Priorize este fundo.")
+    elif net_savings >= (avg_monthly_expense * 6):
+        insights.append("💎 **Segurança Plena:** Você parece ter uma reserva robusta. Já pensou em diversificar para ativos de maior rentabilidade?")
+
+    # 4. Categories Analysis
     cat_map = {c.id: c.name for c in categories}
     expense_by_cat = defaultdict(float)
     for t in transactions:
@@ -33,10 +44,20 @@ def generate_insights(transactions, categories):
             expense_by_cat[cat_name] += t.amount
             
     if expense_by_cat:
-        top_category = max(expense_by_cat, key=expense_by_cat.get)
-        top_amount = expense_by_cat[top_category]
-        if total_expense > 0 and (top_amount / total_expense) > 0.4:
-            insights.append(f"Seus gastos com '{top_category}' representam uma grande parte das suas despesas totais. Considere estabelecer um orçamento semanal para esta categoria.")
+        # Transformando para dict comum para ajudar o type checker
+        cat_data = dict(expense_by_cat)
+        top_category = max(cat_data, key=cat_data.get)
+        top_amount = cat_data[top_category]
+        if total_expense > 0:
+            ratio = (top_amount / total_expense) * 100
+            if ratio > 50:
+                 insights.append(f"📊 **Concentração de Gastos:** Mais de metade do seu dinheiro ({ratio:.0f}%) vai para '{top_category}'. Há espaço para otimização aqui?")
+            elif ratio > 30:
+                 insights.append(f"🔍 **Ponto de Atenção:** '{top_category}' consome {ratio:.0f}% das suas despesas. Verifique se todos esses gastos são essenciais.")
+
+    # 5. Fixed vs Variable (Heuristic)
+    # Categorias como Aluguel, Internet, etc costumam ser "Moradia", "Comunicação"
+    # Aqui poderíamos expandir se tivéssemos flags no schema
     
     return insights
 

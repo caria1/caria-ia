@@ -52,11 +52,17 @@ async function init() {
 
   document.getElementById('logout-btn').addEventListener('click', logout);
 
-  if (token) {
-    await loadUser();
-  } else {
-    showView('auth');
-  }
+  // No modo Cookie-based, sempre tentamos carregar o usuário no início
+  await loadUser();
+
+  // Polling para atualização automática do Dashboard (a cada 5 min)
+  setInterval(() => {
+    const activeNav = document.querySelector('.nav-item.active');
+    if (activeNav && activeNav.dataset.page === 'dashboard' && currentUser) {
+      console.log('Auto-refreshing Dashboard...');
+      renderDashboard();
+    }
+  }, 5 * 60 * 1000);
 }
 
 // ============================================================
@@ -134,8 +140,7 @@ function setupAuth() {
       const data = await apiCall('/auth/token', 'POST',
         { username: document.getElementById('email').value,
           password: document.getElementById('password').value }, true);
-      token = data.access_token;
-      localStorage.setItem('caria_token', token);
+      // O token agora é gerenciado via HTTP-Only cookies pelo backend
       await loadUser();
     } catch(err) {
       alert('E-mail ou senha inválidos: ' + (err.message||''));
@@ -162,8 +167,7 @@ function setupAuth() {
       });
       // Auto-login after register
       const data = await apiCall('/auth/token', 'POST', { username: email, password }, true);
-      token = data.access_token;
-      localStorage.setItem('caria_token', token);
+      // O token agora é gerenciado via HTTP-Only cookies pelo backend
       await loadUser();
     } catch(err) {
       alert('Erro ao criar conta: ' + (err.message||''));
@@ -174,25 +178,73 @@ function setupAuth() {
 }
 
 // ============================================================
-// API HELPER
+// API SERVICE (Centralized & Cached)
 // ============================================================
-async function apiCall(endpoint, method = 'GET', body = null, isForm = false) {
-  const opts = { method, headers: {} };
-  if (token) opts.headers['Authorization'] = `Bearer ${token}`;
-  if (body) {
-    if (isForm) {
-      opts.headers['Content-Type'] = 'application/x-www-form-urlencoded';
-      opts.body = new URLSearchParams(body).toString();
-    } else {
-      opts.headers['Content-Type'] = 'application/json';
-      opts.body = JSON.stringify(body);
+const apiService = {
+  cache: {},
+  
+  async request(endpoint, method = 'GET', body = null, isForm = false, useCache = false) {
+    const cacheKey = `${method}:${endpoint}:${JSON.stringify(body)}`;
+    
+    if (useCache && method === 'GET' && this.cache[cacheKey]) {
+      return this.cache[cacheKey];
     }
+
+    // Mostra loading global se necessário (pode ser expandido futuramente)
+    document.body.classList.add('loading');
+
+    try {
+      const opts = { method, headers: {} };
+      if (token) opts.headers['Authorization'] = `Bearer ${token}`;
+      
+      if (body) {
+        if (isForm) {
+          opts.headers['Content-Type'] = 'application/x-www-form-urlencoded';
+          opts.body = new URLSearchParams(body).toString();
+        } else {
+          opts.headers['Content-Type'] = 'application/json';
+          opts.body = JSON.stringify(body);
+        }
+      }
+
+      const res = await fetch(`${API_URL}${endpoint}`, opts);
+      if (res.status === 204) return null;
+
+      let json = {};
+      try {
+        json = await res.json();
+      } catch (e) {
+        if (!res.ok) {
+          const error = new Error('Servidor indisponível. Tente novamente.');
+          error.status = res.status;
+          throw error;
+        }
+      }
+
+      if (!res.ok) {
+        const error = new Error(json.detail || 'Erro na requisição');
+        error.status = res.status;
+        throw error;
+      }
+
+      if (useCache && method === 'GET') {
+        this.cache[cacheKey] = json;
+      }
+      return json;
+
+    } finally {
+      document.body.classList.remove('loading');
+    }
+  },
+
+  clearCache() {
+    this.cache = {};
   }
-  const res = await fetch(`${API_URL}${endpoint}`, opts);
-  if (res.status === 204) return null;
-  const json = await res.json();
-  if (!res.ok) throw new Error(json.detail || 'Erro na requisição');
-  return json;
+};
+
+// Mantemos apiCall por retrocompatibilidade, mas roteando para o novo serviço
+async function apiCall(endpoint, method = 'GET', body = null, isForm = false) {
+  return apiService.request(endpoint, method, body, isForm);
 }
 
 // ============================================================
@@ -212,13 +264,21 @@ async function loadUser() {
     loadPage('dashboard');
   } catch(e) {
     console.error('loadUser error:', e);
-    logout();
+    if (e.status === 401) {
+      logout();
+    } else {
+      // Se for erro de rede/servidor caindo, não desloga, apenas avisa ou tenta o auth view sem limpar token
+      showView('auth'); 
+    }
   }
 }
 
-function logout() {
+async function logout() {
+  try {
+    await apiCall('/auth/logout', 'POST');
+  } catch (e) {}
   token = null; currentUser = null;
-  localStorage.removeItem('caria_token');
+  localStorage.removeItem('caria_token'); // Limpamos apenas por desencargo
   showView('auth');
 }
 
@@ -287,12 +347,19 @@ function setupNav() {
   document.querySelectorAll('.nav-item').forEach(a => {
     a.addEventListener('click', e => {
       e.preventDefault();
-      document.querySelectorAll('.nav-item').forEach(x=>x.classList.remove('active'));
-      a.classList.add('active');
-      // close mobile sidebar
+      const page = a.dataset.page;
+      
+      // Sincroniza estado ativo em todos os menus (sidebar e bottom-nav)
+      document.querySelectorAll('.nav-item').forEach(x => {
+        if (x.dataset.page === page) x.classList.add('active');
+        else x.classList.remove('active');
+      });
+      
+      // Fecha sidebar mobile se estiver aberta
       document.querySelector('.sidebar')?.classList.remove('open');
       document.querySelector('.sidebar-overlay')?.classList.remove('open');
-      loadPage(a.dataset.page);
+      
+      loadPage(page);
     });
   });
 }
@@ -333,23 +400,48 @@ function setupTxModal() {
 
   document.getElementById('transaction-form')?.addEventListener('submit', async e => {
     e.preventDefault();
+    
+    // Validations
+    const amountVal = document.getElementById('tx-amount').value;
+    const amount = parseFloat(amountVal);
+    const desc = document.getElementById('tx-desc').value.trim();
+    const categoryId = document.getElementById('tx-category').value;
+    const date = document.getElementById('tx-date').value;
+
+    if (isNaN(amount) || amount <= 0) {
+      return alert('O valor da transação deve ser positivo.');
+    }
+    if (!desc) {
+      return alert('Por favor, insira uma descrição.');
+    }
+    if (!categoryId) {
+      return alert('Escolha uma categoria.');
+    }
+    if (!date) {
+      return alert('Selecione uma data válida.');
+    }
+
     const type = document.querySelector('input[name="tx-type"]:checked')?.value || 'expense';
     const body = {
       type,
-      amount:      parseFloat(document.getElementById('tx-amount').value),
-      description: document.getElementById('tx-desc').value,
-      category_id: parseInt(document.getElementById('tx-category').value),
-      date:        document.getElementById('tx-date').value,
-      is_recurring:document.getElementById('tx-recurring').checked,
-      card_id:     document.getElementById('tx-card').value ? parseInt(document.getElementById('tx-card').value) : null
+      amount,
+      description: desc,
+      category_id: parseInt(categoryId),
+      date,
+      is_recurring: document.getElementById('tx-recurring').checked,
+      card_id: document.getElementById('tx-card').value ? parseInt(document.getElementById('tx-card').value) : null
     };
+    
     try {
       await apiCall('/transactions/', 'POST', body);
+      apiService.clearCache(); // Limpa cache para refletir mudanças
       overlay.classList.remove('open');
       await refreshHeaderStats();
       const active = document.querySelector('.nav-item.active');
       if (active) loadPage(active.dataset.page);
-    } catch(err) { alert(err.message); }
+    } catch(err) { 
+      alert('Erro ao salvar: ' + err.message); 
+    }
   });
 }
 
@@ -1171,69 +1263,133 @@ async function renderAdvisor() {
 // REPORTS
 // ============================================================
 async function renderReports() {
-  const [txs, comparison] = await Promise.all([
-    apiCall('/transactions/'),
-    apiCall('/ai/comparison').catch(()=>({comparison:[]}))
-  ]);
+  pageContent.innerHTML = `<div class="spinner"><i class="ph ph-spinner-gap"></i></div>`;
+  
+  try {
+    const [txs, evolution, distribution] = await Promise.all([
+      apiCall('/transactions/'),
+      apiCall('/reports/net-worth-evolution').catch(()=>({evolution:[]})),
+      apiCall('/reports/category-distribution').catch(()=>({distribution:[]}))
+    ]);
 
-  const income  = txs.filter(t=>t.type==='income').reduce((s,t)=>s+t.amount,0);
-  const expense = txs.filter(t=>t.type==='expense').reduce((s,t)=>s+t.amount,0);
-  const net     = income-expense;
+    const income  = txs.filter(t=>t.type==='income').reduce((s,t)=>s+t.amount,0);
+    const expense = txs.filter(t=>t.type==='expense').reduce((s,t)=>s+t.amount,0);
+    const net     = income-expense;
 
-  // Category breakdown
-  const catMap={};
-  txs.filter(t=>t.type==='expense').forEach(t=>{ const n=t.category_name||'Diversos'; catMap[n]=(catMap[n]||0)+t.amount; });
-  const catKeys=Object.keys(catMap).sort((a,b)=>catMap[b]-catMap[a]);
-
-  pageContent.innerHTML = `
-    <div class="section-header">
-      <h2>Relatórios</h2>
-      <button class="btn-primary" onclick="exportPDF()"><i class="ph ph-file-pdf"></i> Exportar PDF</button>
-    </div>
-    <div class="grid-3 mb-4">
-      <div class="card text-center"><p class="card-title">Total Receitas</p><h2 class="text-success">${fmtBRL(income)}</h2></div>
-      <div class="card text-center"><p class="card-title">Total Despesas</p><h2 class="text-danger">${fmtBRL(expense)}</h2></div>
-      <div class="card text-center"><p class="card-title">Resultado Líquido</p><h2 class="${net>=0?'text-success':'text-danger'}">${fmtBRL(net)}</h2></div>
-    </div>
-    <div class="grid-2 mb-4">
-      <div class="card">
-        <p class="card-title">Gastos por Categoria</p>
-        <canvas id="rep-cat-chart" height="220"></canvas>
+    pageContent.innerHTML = `
+      <div class="section-header">
+        <h2>Relatórios Avançados</h2>
+        <div class="d-flex gap-2">
+          <button class="btn-secondary" onclick="exportCSV()"><i class="ph ph-file-csv"></i> Exportar CSV</button>
+          <button class="btn-primary" onclick="exportPDF()"><i class="ph ph-file-pdf"></i> Exportar PDF</button>
+        </div>
+      </div>
+      <div class="grid-3 mb-4">
+        <div class="card text-center"><p class="card-title">Total Receitas</p><h2 class="text-success">${fmtBRL(income)}</h2></div>
+        <div class="card text-center"><p class="card-title">Total Despesas</p><h2 class="text-danger">${fmtBRL(expense)}</h2></div>
+        <div class="card text-center"><p class="card-title">Resultado Líquido</p><h2 class="${net>=0?'text-success':'text-danger'}">${fmtBRL(net)}</h2></div>
+      </div>
+      <div class="grid-2 mb-4">
+        <div class="card">
+          <p class="card-title">Distribuição por Categoria (%)</p>
+          <canvas id="rep-cat-chart" height="220"></canvas>
+        </div>
+        <div class="card">
+          <p class="card-title">Evolução de Patrimônio (12 Meses)</p>
+          <canvas id="rep-evo-chart" height="220"></canvas>
+        </div>
       </div>
       <div class="card">
-        <p class="card-title">Evolução Mensal (Receita vs Despesa)</p>
-        <canvas id="rep-line-chart" height="220"></canvas>
+        <p class="card-title">Resumo de Categorias</p>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Categoria</th><th>Total Gasto</th><th>% do Total</th></tr></thead>
+            <tbody>
+              ${distribution.distribution?.map(d=>`
+                <tr>
+                  <td><strong>${d.category}</strong></td>
+                  <td class="text-danger">${fmtBRL(d.amount)}</td>
+                  <td>${d.percentage}%</td>
+                </tr>
+              `).join('') || '<tr><td colspan="3" class="text-center text-muted">Sem dados.</td></tr>'}
+            </tbody>
+          </table>
+        </div>
       </div>
-    </div>
-    <div class="card">
-      <p class="card-title">IR Estimado sobre Investimentos</p>
-      <p class="text-muted" style="font-size:13px;">Para cálculo de IR sobre ganhos no mercado, acesse a aba Investimentos e exporte o relatório.</p>
-    </div>`;
+    `;
 
-  const cc=getChartColors();
-  const pieCtx=document.getElementById('rep-cat-chart')?.getContext('2d');
-  if(pieCtx) charts['rep-cat']=new Chart(pieCtx,{
-    type:'doughnut',
-    data:{labels:catKeys,datasets:[{data:catKeys.map(k=>catMap[k]),backgroundColor:catKeys.map(k=>categoryColor(k)),borderWidth:2,borderColor:'var(--bg-card)'}]},
-    options:{plugins:{legend:{position:'right',labels:{color:cc.text,font:{size:11}}}},animation:{duration:800}}
-  });
-
-  const lineCtx=document.getElementById('rep-line-chart')?.getContext('2d');
-  if(lineCtx) {
-    const comp=comparison.comparison||[];
-    charts['rep-line']=new Chart(lineCtx,{
-      type:'line',
-      data:{labels:comp.map(c=>c.month),datasets:[
-        {label:'Receita',data:comp.map(c=>c.income),borderColor:'var(--success)',backgroundColor:'rgba(0,255,136,0.1)',tension:0.4,fill:true},
-        {label:'Despesa',data:comp.map(c=>c.expenses),borderColor:'var(--danger)',backgroundColor:'rgba(255,68,68,0.1)',tension:0.4,fill:true}
-      ]},
-      options:{responsive:true,maintainAspectRatio:false,
-        plugins:{legend:{labels:{color:cc.text}}},
-        scales:{x:{grid:{color:cc.grid},ticks:{color:cc.text}},y:{grid:{color:cc.grid},ticks:{color:cc.text}}}
+    const cc = getChartColors();
+    const distData = distribution.distribution || [];
+    const pieCtx = document.getElementById('rep-cat-chart')?.getContext('2d');
+    if(pieCtx) charts['rep-cat'] = new Chart(pieCtx, {
+      type: 'doughnut',
+      data: {
+        labels: distData.map(d=>d.category),
+        datasets: [{
+          data: distData.map(d=>d.amount),
+          backgroundColor: distData.map(d=>categoryColor(d.category)),
+          borderWidth: 2,
+          borderColor: 'var(--bg-card)'
+        }]
+      },
+      options: {
+        plugins: { legend: { position: 'right', labels: { color: cc.text, font: { size: 10 } } } },
+        animation: { duration: 800 }
       }
     });
+
+    const evoCtx = document.getElementById('rep-evo-chart')?.getContext('2d');
+    if(evoCtx) {
+      const evo = evolution.evolution || [];
+      charts['rep-evo'] = new Chart(evoCtx, {
+        type: 'line',
+        data: {
+          labels: evo.map(e=>e.month),
+          datasets: [{
+            label: 'Patrimônio Líquido',
+            data: evo.map(e=>e.balance),
+            borderColor: 'var(--primary-l)',
+            backgroundColor: 'rgba(123,47,190,0.1)',
+            tension: 0.4,
+            fill: true,
+            pointRadius: 4
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { labels: { color: cc.text } } },
+          scales: {
+            x: { grid: { color: cc.grid }, ticks: { color: cc.text } },
+            y: { grid: { color: cc.grid }, ticks: { color: cc.text, callback: v=>'R$'+v.toLocaleString('pt-BR') } }
+          }
+        }
+      });
+    }
+  } catch(err) {
+    console.error(err);
+    pageContent.innerHTML = `<div class="card"><p class="text-danger">Erro ao carregar relatórios.</p></div>`;
   }
 }
+window.exportCSV = () => {
+  if (!allTransactions || !allTransactions.length) return alert('Nenhuma transação para exportar.');
+  const headers = ['Data', 'Descrição', 'Categoria', 'Tipo', 'Valor'];
+  const rows = allTransactions.map(t => [
+    new Date(t.date).toLocaleDateString('pt-BR'),
+    t.description,
+    t.category_name || 'Diversos',
+    t.type === 'income' ? 'Receita' : 'Despesa',
+    t.amount.toString().replace('.', ',')
+  ]);
+  const content = [headers, ...rows].map(e => e.join(';')).join('\n');
+  const blob = new Blob(['\ufeff' + content], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.setAttribute('href', url);
+  link.setAttribute('download', `caria_ia_export_${new Date().getTime()}.csv`);
+  link.click();
+};
+
 window.exportPDF = async () => {
   try {
     const {jsPDF} = window.jspdf;
