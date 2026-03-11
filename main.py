@@ -47,8 +47,16 @@ from backend.database import engine
 from backend import models
 from backend.routers import auth, transactions, categories, goals, ai, bills, cards, investments, gamification, reports, control
 
-# Criar Tabelas
-models.Base.metadata.create_all(bind=engine)
+# Evento de Startup para estabilidade
+@app.on_event("startup")
+def startup_event():
+    logger.info("Executando tarefas de inicialização...")
+    try:
+        # Criar Tabelas
+        models.Base.metadata.create_all(bind=engine)
+        logger.info("Tabelas do Banco de Dados verificadas/criadas.")
+    except Exception as e:
+        logger.error(f"Erro no startup: {e}")
 
 # Registrar Roteadores
 app.include_router(auth.router, prefix="/api/auth", tags=["Auth"])
