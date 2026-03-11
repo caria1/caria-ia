@@ -5,10 +5,22 @@ import models
 from routers import auth, transactions, categories, goals, ai, bills, cards, investments, gamification, reports, control
 from database import engine, Base
 
-# Create DB tables
-models.Base.metadata.create_all(bind=engine)
+import logging
 
-app = FastAPI(title="Finance AI API")
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+# Create DB tables - wrapped in try/except to avoid crashing the whole app on startup
+# This allows the health check to pass so we can debug the logs
+try:
+    logger.info("Initializing database tables...")
+    models.Base.metadata.create_all(bind=engine)
+    logger.info("Database tables initialized successfully.")
+except Exception as e:
+    logger.error(f"Failed to initialize database tables: {e}")
+
+app = FastAPI(title="Caria IA API")
 
 # Setup CORS
 origins = [

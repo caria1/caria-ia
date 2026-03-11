@@ -12,7 +12,14 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
+# O Railway vai rodar a partir daqui
+WORKDIR /app/backend
+
+# PYTHONPATH garante que os imports locais funcionem
 ENV PYTHONPATH=/app/backend
+
+# Porta injetada pelo Railway
 ENV PORT=8080
 
-CMD ["uvicorn", "main:app", "--proxy-headers", "--host", "0.0.0.0", "--port", "8080"]
+# Usamos uvicorn main:app pois estamos dentro da pasta backend
+CMD uvicorn main:app --proxy-headers --host 0.0.0.0 --port $PORT
