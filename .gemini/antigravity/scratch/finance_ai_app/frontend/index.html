@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="pt-BR" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Caria IA – Sua inteligência financeira pessoal</title>
+    <meta name="description" content="Caria IA: Planejamento financeiro inteligente com IA, investimentos, metas e relatórios completos.">
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <!-- jsPDF -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <!-- Phosphor Icons -->
+    <script src="https://unpkg.com/@phosphor-icons/web@2.1.1"></script>
+    <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+
+<!-- ===================== AUTH VIEW ===================== -->
+<div id="auth-view" class="view active">
+    <div class="auth-bg">
+        <div class="auth-orb auth-orb-1"></div>
+        <div class="auth-orb auth-orb-2"></div>
+        <div class="auth-orb auth-orb-3"></div>
+    </div>
+    <div class="auth-card">
+        <div class="auth-logo">
+            <div class="auth-logo-icon">
+                <i class="ph-fill ph-sparkle"></i>
+            </div>
+            <h1>Caria <span class="text-gradient">IA</span></h1>
+        </div>
+        <p class="auth-slogan">Sua inteligência financeira pessoal</p>
+
+        <div class="auth-tabs">
+            <button class="auth-tab active" id="tab-login">Entrar</button>
+            <button class="auth-tab" id="tab-register">Criar conta</button>
+        </div>
+
+        <form id="login-form" class="auth-form">
+            <div class="form-group">
+                <i class="ph ph-envelope"></i>
+                <input type="email" id="email" placeholder="Seu e-mail" required>
+            </div>
+            <div class="form-group">
+                <i class="ph ph-lock"></i>
+                <input type="password" id="password" placeholder="Sua senha" required>
+            </div>
+            <button type="submit" class="btn-auth">
+                <span>Entrar na conta</span>
+                <i class="ph ph-arrow-right"></i>
+            </button>
+        </form>
+
+        <form id="register-form" class="auth-form" style="display:none;">
+            <div class="form-group">
+                <i class="ph ph-user"></i>
+                <input type="text" id="reg-name" placeholder="Nome completo" required>
+            </div>
+            <div class="form-group">
+                <i class="ph ph-envelope"></i>
+                <input type="email" id="reg-email" placeholder="Seu e-mail" required>
+            </div>
+            <div class="form-group">
+                <i class="ph ph-lock"></i>
+                <input type="password" id="reg-password" placeholder="Crie uma senha" required>
+            </div>
+            <button type="submit" class="btn-auth">
+                <span>Criar minha conta</span>
+                <i class="ph ph-arrow-right"></i>
+            </button>
+        </form>
+
+        <p class="auth-footer">Seus dados são protegidos com criptografia AES-256</p>
+    </div>
+</div>
+
+<!-- ===================== APP VIEW ===================== -->
+<div id="app-view" class="view">
+
+    <!-- SIDEBAR -->
+    <aside class="sidebar" id="sidebar">
+        <div class="sidebar-logo">
+            <div class="sidebar-logo-icon"><i class="ph-fill ph-sparkle"></i></div>
+            <span>Caria <strong>IA</strong></span>
+        </div>
+
+        <nav class="sidebar-nav">
+            <a href="#" class="nav-item active" data-page="dashboard" id="nav-dashboard">
+                <i class="ph ph-squares-four"></i>
+                <span>Dashboard</span>
+            </a>
+            <a href="#" class="nav-item" data-page="transactions" id="nav-transactions">
+                <i class="ph ph-arrows-left-right"></i>
+                <span>Transações</span>
+            </a>
+            <a href="#" class="nav-item" data-page="cards" id="nav-cards">
+                <i class="ph ph-credit-card"></i>
+                <span>Cartões</span>
+            </a>
+            <a href="#" class="nav-item" data-page="investments" id="nav-investments">
+                <i class="ph ph-chart-line-up"></i>
+                <span>Investimentos</span>
+            </a>
+            <a href="#" class="nav-item" data-page="goals" id="nav-goals">
+                <i class="ph ph-target"></i>
+                <span>Metas</span>
+            </a>
+            <a href="#" class="nav-item" data-page="bills" id="nav-bills">
+                <i class="ph ph-receipt"></i>
+                <span>Contas</span>
+            </a>
+            <a href="#" class="nav-item" data-page="advisor" id="nav-advisor">
+                <i class="ph ph-brain"></i>
+                <span>IA Advisor</span>
+                <span class="nav-badge">IA</span>
+            </a>
+            <a href="#" class="nav-item" data-page="reports" id="nav-reports">
+                <i class="ph ph-chart-bar"></i>
+                <span>Relatórios</span>
+            </a>
+            <a href="#" class="nav-item" data-page="gamification" id="nav-gamification">
+                <i class="ph ph-medal"></i>
+                <span>Conquistas</span>
+            </a>
+            <a href="#" class="nav-item" data-page="profile" id="nav-profile">
+                <i class="ph ph-gear"></i>
+                <span>Configurações</span>
+            </a>
+        </nav>
+
+        <div class="sidebar-bottom">
+            <button id="theme-toggle" class="sidebar-action-btn">
+                <i class="ph ph-moon" id="theme-icon"></i>
+                <span id="theme-label">Tema Escuro</span>
+            </button>
+            <button id="logout-btn" class="sidebar-action-btn danger">
+                <i class="ph ph-sign-out"></i>
+                <span>Sair</span>
+            </button>
+        </div>
+    </aside>
+
+    <!-- MAIN CONTENT -->
+    <div class="main-wrapper">
+
+        <!-- TOP HEADER -->
+        <header class="top-header">
+            <div class="header-left">
+                <button class="hamburger-btn" id="sidebar-toggle">
+                    <i class="ph ph-list"></i>
+                </button>
+                <div class="user-meta" id="user-meta">
+                    <div class="user-avatar-initials" id="user-avatar">?</div>
+                    <div class="user-info">
+                        <span class="user-name" id="user-name-display">Carregando...</span>
+                        <span class="user-role">Planejador Financeiro</span>
+                    </div>
+                </div>
+                <!-- Month selector -->
+                <div class="month-selector" id="month-selector">
+                    <button class="month-btn" id="prev-month"><i class="ph ph-caret-left"></i></button>
+                    <span class="month-label" id="month-label">MAR 2026</span>
+                    <button class="month-btn" id="next-month"><i class="ph ph-caret-right"></i></button>
+                </div>
+            </div>
+
+            <div class="header-cards">
+                <div class="header-stat-card income">
+                    <div class="hsc-icon"><i class="ph-fill ph-trend-up"></i></div>
+                    <div class="hsc-info">
+                        <span class="hsc-label">Receita</span>
+                        <span class="hsc-value" id="header-income">R$ 0,00</span>
+                    </div>
+                </div>
+                <div class="header-stat-card expense">
+                    <div class="hsc-icon"><i class="ph-fill ph-trend-down"></i></div>
+                    <div class="hsc-info">
+                        <span class="hsc-label">Despesa</span>
+                        <span class="hsc-value" id="header-expense">R$ 0,00</span>
+                    </div>
+                </div>
+                <div class="header-stat-card balance">
+                    <div class="hsc-icon"><i class="ph-fill ph-wallet"></i></div>
+                    <div class="hsc-info">
+                        <span class="hsc-label">Saldo</span>
+                        <span class="hsc-value" id="header-balance">R$ 0,00</span>
+                    </div>
+                </div>
+                <!-- Quick Add -->
+                <button class="btn-add-tx" id="open-tx-modal">
+                    <i class="ph ph-plus"></i>
+                    <span>Nova</span>
+                </button>
+            </div>
+        </header>
+
+        <!-- PAGE CONTENT -->
+        <main class="page-content" id="page-content">
+            <!-- Injected dynamically -->
+        </main>
+    </div>
+</div>
+
+<!-- ===== TRANSACTION MODAL ===== -->
+<div class="modal-overlay" id="tx-modal-overlay">
+    <div class="modal-box" id="tx-modal-box">
+        <div class="modal-header">
+            <h3>Nova Transação</h3>
+            <button class="modal-close" id="close-tx-modal"><i class="ph ph-x"></i></button>
+        </div>
+        <form id="transaction-form" class="modal-body">
+            <div class="tx-type-toggle">
+                <label class="tx-type-opt">
+                    <input type="radio" name="tx-type" value="expense" checked>
+                    <span class="badge-expense"><i class="ph ph-arrow-down"></i> Despesa</span>
+                </label>
+                <label class="tx-type-opt">
+                    <input type="radio" name="tx-type" value="income">
+                    <span class="badge-income"><i class="ph ph-arrow-up"></i> Receita</span>
+                </label>
+            </div>
+            <div class="form-row">
+                <div class="form-field">
+                    <label>Valor (R$)</label>
+                    <input type="number" id="tx-amount" step="0.01" placeholder="0,00" required>
+                </div>
+                <div class="form-field">
+                    <label>Data</label>
+                    <input type="date" id="tx-date" required>
+                </div>
+            </div>
+            <div class="form-field">
+                <label>Descrição</label>
+                <input type="text" id="tx-desc" placeholder="Ex: Aluguel, Supermercado..." required>
+            </div>
+            <div class="form-row">
+                <div class="form-field">
+                    <label>Categoria</label>
+                    <select id="tx-category" required></select>
+                </div>
+                <div class="form-field">
+                    <label>Cartão (opcional)</label>
+                    <select id="tx-card"><option value="">Nenhum</option></select>
+                </div>
+            </div>
+            <label class="checkbox-label">
+                <input type="checkbox" id="tx-recurring"> Transação recorrente (mensal)
+            </label>
+            <button type="submit" class="btn-primary w-full mt-4">Salvar Transação</button>
+        </form>
+    </div>
+</div>
+
+<!-- Hidden file inputs -->
+<input type="file" id="profile-pic-input" accept="image/*" style="display:none;">
+<input type="file" id="csv-import-input" accept=".csv,.ofx" style="display:none;">
+
+<script src="/app.js"></script>
+</body>
+</html>
