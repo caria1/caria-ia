@@ -4,7 +4,7 @@ from typing import List, Dict, Any
 from backend import models, schemas
 from backend.database import get_db
 from backend.routers.auth import get_current_user
-from ai_module.advisor import generate_insights, generate_business_ideas, forecast_balance
+from backend.ai_module.advisor import generate_insights, generate_business_ideas, forecast_balance
 
 router = APIRouter()
 
