@@ -130,6 +130,22 @@ function setupAuth() {
     regForm.style.display = 'flex'; loginForm.style.display = 'none';
   });
 
+  // Toggle Password Visibility
+  document.querySelectorAll('.btn-toggle-password').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const inputId = btn.dataset.target;
+      const input = document.getElementById(inputId);
+      const icon = btn.querySelector('i');
+      if (input.type === 'password') {
+        input.type = 'text';
+        icon.className = 'ph ph-eye-slash';
+      } else {
+        input.type = 'password';
+        icon.className = 'ph ph-eye';
+      }
+    });
+  });
+
   loginForm?.addEventListener('submit', async e => {
     e.preventDefault();
     const btn = loginForm.querySelector('button[type=submit]');
@@ -261,14 +277,40 @@ async function loadUser() {
     showView('app');
     updateHeader();
     await refreshHeaderStats();
-    loadPage('dashboard');
+    
+    // Se estávamos em alguma página específica, mantém nela. Senão, vai para o dashboard.
+    const active = document.querySelector('.nav-item.active');
+    if (!active) loadPage('dashboard');
+    else loadPage(active.dataset.page);
+
   } catch(e) {
     console.error('loadUser error:', e);
+    // 401 = Token expirado ou inválido -> Logout real
     if (e.status === 401) {
       logout();
     } else {
-      // Se for erro de rede/servidor caindo, não desloga, apenas avisa ou tenta o auth view sem limpar token
-      showView('auth'); 
+      // Se for erro de rede (status undefined) ou 5xx (servidor reiniciando)
+      // Não deslogamos o usuário. Se ele já estava no app, deixamos ele lá.
+      // Se é o primeiro carregamento e falhou, mostramos uma tela de "reconectando" em vez de login.
+      console.log('Servidor offline ou erro de rede. Mantendo estado atual.');
+      if (!currentUser) {
+        // Se realmente não temos sessão inicial e o servidor não responde,
+        // esperamos um pouco ou mostramos erro, mas EVITAMOS forçar o login
+        // a menos que saibamos que o token é inválido.
+        if (e.status >= 400 && e.status < 500) {
+           showView('auth');
+        } else {
+           // Servidor fora do ar (5xx ou Network Error)
+           document.body.innerHTML = `
+             <div style="height:100vh; display:flex; flex-direction:column; align-items:center; justify-content:center; background:var(--bg); color:var(--text);">
+               <i class="ph ph-warning-circle" style="font-size:48px; color:var(--warning); margin-bottom:16px;"></i>
+               <h2>Caria IA está reiniciando...</h2>
+               <p class="text-muted">Aguarde um instante, estamos voltando online.</p>
+               <button class="btn-primary mt-4" onclick="location.reload()">Tentar novamente</button>
+             </div>
+           `;
+        }
+      }
     }
   }
 }

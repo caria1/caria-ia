@@ -53,6 +53,15 @@
             <div class="form-group">
                 <i class="ph ph-lock"></i>
                 <input type="password" id="password" placeholder="Sua senha" required>
+                <button type="button" class="btn-toggle-password" data-target="password">
+                    <i class="ph ph-eye"></i>
+                </button>
+            </div>
+            <div class="auth-options">
+                <label class="checkbox-label">
+                    <input type="checkbox" id="remember-me"> Manter logado
+                </label>
+                <a href="#" class="auth-link">Esqueci a senha</a>
             </div>
             <button type="submit" class="btn-auth">
                 <span>Entrar na conta</span>
@@ -72,6 +81,9 @@
             <div class="form-group">
                 <i class="ph ph-lock"></i>
                 <input type="password" id="reg-password" placeholder="Crie uma senha" required>
+                <button type="button" class="btn-toggle-password" data-target="reg-password">
+                    <i class="ph ph-eye"></i>
+                </button>
             </div>
             <button type="submit" class="btn-auth">
                 <span>Criar minha conta</span>

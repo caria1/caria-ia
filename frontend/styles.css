@@ -212,11 +212,37 @@ ul { list-style:none; }
   padding:0 14px; color:var(--text-3); font-size:18px;
 }
 .form-group input {
-  flex:1; padding:13px 14px 13px 0;
+  flex:1; padding:13px 40px 13px 0; /* Aumentado o padding-right para o olhinho */
   background:none; border:none; outline:none;
   color:var(--text); font-size:14px;
 }
 .form-group input::placeholder { color:var(--text-3); }
+
+.btn-toggle-password {
+  position: absolute; right: 10px;
+  background: none; border: none;
+  color: var(--text-3); cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  padding: 8px; font-size: 18px;
+  transition: color 0.2s;
+}
+.btn-toggle-password:hover { color: var(--text); }
+
+.auth-options {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-top: 4px; margin-bottom: 8px;
+}
+.checkbox-label {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 13px; color: var(--text-2); cursor: pointer;
+  user-select: none;
+}
+.checkbox-label input { width: 16px; height: 16px; cursor: pointer; }
+.auth-link {
+  font-size: 13px; color: var(--primary-l); text-decoration: none;
+  font-weight: 500; transition: color 0.2s;
+}
+.auth-link:hover { color: var(--accent); text-decoration: underline; }
 
 .btn-auth {
   display:flex; align-items:center; justify-content:center; gap:8px;
