@@ -5,7 +5,6 @@ from pydantic import BaseModel
 from backend import models, schemas, utils
 import os
 from backend.database import get_db
-from backend.security import limiter
 import logging
 
 router = APIRouter()
@@ -44,7 +43,6 @@ def get_current_user(request: Request, db: Session = Depends(get_db)):
     return user
 
 @router.post("/register", response_model=schemas.UserOut)
-@limiter.limit("5/minute")
 def create_user(request: Request, user: schemas.UserCreate, db: Session = Depends(get_db)):
     logging.info("Iniciando registro de novo usuário.")
     db_user = db.query(models.User).filter(models.User.email == user.email).first()
@@ -90,7 +88,6 @@ def create_user(request: Request, user: schemas.UserCreate, db: Session = Depend
     return db_user
 
 @router.post("/token", response_model=schemas.Token)
-@limiter.limit("5/minute")
 def login_for_access_token(request: Request, response: Response, form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
     user = db.query(models.User).filter(models.User.email == form_data.username).first()
     if not user or not utils.verify_password(form_data.password, user.hashed_password):
@@ -103,7 +100,7 @@ def login_for_access_token(request: Request, response: Response, form_data: OAut
     access_token = utils.create_access_token(
         data={"sub": user.email}, expires_delta=access_token_expires
     )
-    
+
     # Define o cookie HTTP-Only
     response.set_cookie(
         key="caria_token",
@@ -114,7 +111,7 @@ def login_for_access_token(request: Request, response: Response, form_data: OAut
         samesite="lax",
         secure=True # Railway usa HTTPS por padrão
     )
-    
+
     return {"access_token": access_token, "token_type": "bearer"}
 
 @router.post("/logout")
