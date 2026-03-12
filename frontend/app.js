@@ -1,7 +1,7 @@
 // ============================================================
 // CARIA IA – app.js
 // ============================================================
-const API_URL = '/api';
+const API_URL = '/api'; // Certifique-se de que as chamadas estão usando a URL relativa e não localhost.
 
 let token = localStorage.getItem('caria_token');
 let currentUser = null;
