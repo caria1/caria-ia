@@ -18,3 +18,28 @@ logger = logging.getLogger(__name__)
 
 # Caminho Base
 current_dir = os.path.dirname(os.path.abspath(__file__))
+
+# Inicialização do FastAPI
+app = FastAPI()
+
+# Middleware de CORS
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Importando os roteadores
+from backend.routers import ai, auth
+
+# Incluindo os roteadores
+app.include_router(ai.router, prefix="/api/ai")
+app.include_router(auth.router, prefix="/api/auth")
+
+@app.get("/")
+async def root():
+    return {"message": "API funcionando corretamente!"}
+
+# Certifique-se de que não há bloco if __name__ == "__main__" para exportar app globalmente.

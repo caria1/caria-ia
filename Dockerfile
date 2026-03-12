@@ -1,4 +1,4 @@
-FROM python:3.10-slim
+FROM python:3.11-slim
 
 WORKDIR /app
 
@@ -20,4 +20,4 @@ ENV PYTHONPATH=/app
 ENV PORT=8080
 
 # Roda o main.py da RAIZ (que importa o backend)
-CMD uvicorn main:app --proxy-headers --host 0.0.0.0 --port $PORT
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "${PORT:-8000}"]
