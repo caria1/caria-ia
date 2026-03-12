@@ -3,13 +3,13 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import declarative_base
 from sqlalchemy.orm import sessionmaker
 
-# Detect PostgreSQL (Railway) or SQLite (Local)
-# Se estiver no Railway, a URL começa com postgres:// ou postgresql://
-SQLALCHEMY_DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./backend/finance.db")
+# Tratamento da DATABASE_URL para aceitar postgresql://
+uri = os.getenv('DATABASE_URL')
+if uri and uri.startswith('postgres://'):
+    uri = uri.replace('postgres://', 'postgresql://', 1)
 
-# Railway fix: o SQLAlchemy exige postgresql:// em vez de postgres://
-if SQLALCHEMY_DATABASE_URL.startswith("postgres://"):
-    SQLALCHEMY_DATABASE_URL = SQLALCHEMY_DATABASE_URL.replace("postgres://", "postgresql://", 1)
+# Use essa 'uri' para criar o engine
+SQLALCHEMY_DATABASE_URL = uri or "sqlite:///./backend/finance.db"
 
 connect_args = {}
 if SQLALCHEMY_DATABASE_URL.startswith("sqlite"):
