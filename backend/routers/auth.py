@@ -6,6 +6,7 @@ from backend import models, schemas, utils
 import os
 from backend.database import get_db
 from backend.security import limiter
+import logging
 
 router = APIRouter()
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/token")
@@ -45,16 +46,20 @@ def get_current_user(request: Request, db: Session = Depends(get_db)):
 @router.post("/register", response_model=schemas.UserOut)
 @limiter.limit("5/minute")
 def create_user(request: Request, user: schemas.UserCreate, db: Session = Depends(get_db)):
+    logging.info("Iniciando registro de novo usuário.")
     db_user = db.query(models.User).filter(models.User.email == user.email).first()
     if db_user:
+        logging.warning("Tentativa de registro com email já existente: %s", user.email)
         raise HTTPException(status_code=400, detail="Email already registered")
-    
+
     hashed_password = utils.get_password_hash(user.password)
     db_user = models.User(email=user.email, full_name=user.full_name, hashed_password=hashed_password)
     db.add(db_user)
     db.commit()
     db.refresh(db_user)
-    
+
+    logging.info("Usuário registrado com sucesso: %s", user.email)
+
     # Cria categorias padrão em português
     default_categories = [
         {"name": "Salário",           "type": "income"},
@@ -74,10 +79,14 @@ def create_user(request: Request, user: schemas.UserCreate, db: Session = Depend
         {"name": "Diversos",          "type": "expense"},
     ]
     for cat in default_categories:
-        new_cat = models.Category(name=cat["name"], type=cat["type"], owner_id=db_user.id)
-        db.add(new_cat)
+        try:
+            new_cat = models.Category(name=cat["name"], type=cat["type"], owner_id=db_user.id)
+            db.add(new_cat)
+        except Exception as e:
+            logging.error("Erro ao criar categoria %s: %s", cat["name"], str(e))
     db.commit()
 
+    logging.info("Categorias padrão criadas com sucesso para o usuário: %s", user.email)
     return db_user
 
 @router.post("/token", response_model=schemas.Token)
