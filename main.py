@@ -23,9 +23,24 @@ from backend.database import engine
 from backend import models
 from backend.routers import auth, transactions, categories, goals, ai, bills, cards, investments, gamification, reports, control
 
-@app.on_event('startup')
-def startup():
-    models.Base.metadata.create_all(bind=engine)
+@app.on_event("startup")
+def startup_event():
+    logger.info("Iniciando Caria IA...")
+    try:
+        models.Base.metadata.create_all(bind=engine)
+        logger.info("Tabelas criadas com sucesso!")
+    except Exception as e:
+        logger.error(f"Erro ao conectar ou criar tabelas no banco de dados: {e}")
+
+@app.get("/api/test")
+def test_connection():
+    try:
+        with engine.connect() as connection:
+            connection.execute("SELECT 1")
+        return {"status": "success", "message": "Conexão com o banco de dados bem-sucedida."}
+    except Exception as e:
+        logger.error(f"Erro ao testar conexão com o banco de dados: {e}")
+        return {"status": "error", "message": str(e)}
 
 app.include_router(auth.router, prefix='/api/auth')
 app.include_router(categories.router, prefix='/api/categories')
